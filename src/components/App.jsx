@@ -1,20 +1,26 @@
 import { Component } from "react"
 import { MoviesGallery } from "./MoviesGallery/MoviesGallery"
-import movies from "../data/movies.json"
 import { mapper } from "utils/mapper"
 import { Modal } from "./Modal/Modal"
+import { fetchApi } from "api/api"
+import { Button } from "./Button/Button"
+import { Loader } from "./Loader/Loader"
 
 export class App extends Component {
   state = {
-    movies: mapper(movies),
+    movies: [],
     currentImage: null,
+    page: 1,
+    isLoading: false,
+    error: null,
+    isShown: false,
   }
   
   componentDidUpdate(prevProps, prevState) {
-    const {movies} = this.state;
-    if(movies !== prevState.movies) {
-      localStorage.setItem("movies", JSON.stringify(movies))
-   }
+    const {isShown, page} = this.state;
+    if(prevState.isShown !== isShown && isShown || prevState.page !== page) {
+      this.fetchMovies()
+    }
   };
 
   componentDidMount() {
@@ -38,12 +44,33 @@ export class App extends Component {
     this.setState({currentImage: null})
   }
 
+  shownFilms = () => { 
+    if(this.state.isShown) {
+      this.setState({movies: []})
+    }
+    this.setState(prevState => ({isShown: !prevState.isShown}))
+  }
+
+  fetchMovies = () => {
+    const page = this.state.page;
+    this.setState({isLoading: true});
+    fetchApi(page).then(resp => this.setState(prevState => ({movies: [...prevState.movies, ...mapper(resp.data.results)]})))
+    .catch(error => {this.setState({error: error.message})}).finally(this.setState({isLoading: false}))
+  }
+
+  loadMore = () => {
+    this.setState(prevState => ({page: prevState.page + 1}))
+  }
+
   render () {
-    const {movies, currentImage} = this.state;
+    const {movies, currentImage, isShown, isLoading} = this.state;
 
   return (
     <>
-   <MoviesGallery movies={movies} deleteMovie={this.deleteMovie} openModal={this.updateCurrentImage}/>
+   <Button text={!isShown ? "Show Movies" : "Hide Movies"} handlerClick={this.shownFilms}/>
+   {isShown && <MoviesGallery movies={movies} deleteMovie={this.deleteMovie} openModal={this.updateCurrentImage}/>}
+   {!isLoading && <Button text="Load More" handlerClick={this.loadMore}/>}
+    {isLoading && <Loader/>}
    {currentImage && <Modal image={currentImage} closeModal={this.closeModal}/>}
    </>
   )
